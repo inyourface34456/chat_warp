@@ -1,32 +1,29 @@
-use warp::{Reply, reply, Rejection, sse::Event, reject};
-use crate::WebhookList;
+use crate::{WebhookList, Message};
 use std::convert::Infallible;
+use warp::{reject, reply, sse::Event, Rejection, Reply};
 
 pub fn sse_counter(counter: String) -> Result<Event, Infallible> {
     Ok(warp::sse::Event::default().data(counter))
 }
 
-pub async fn send(id: String, data: String, ids: WebhookList) -> Result<impl Reply, Rejection> {
-    let sender = match ids.get_id(id) {
+pub async fn send(message: Message, ids: WebhookList) -> Result<impl Reply, Rejection> {
+    let sender = match ids.get_id(message.destnation.to_string()) {
         Some(dat) => dat.0,
-        None => return Err(reject())
+        None => return Err(reject()),
     };
-    
-    let _ = sender.send(data);
+
+    let _ = sender.send(serde_json::to_string(&message).unwrap());
     Ok(reply::html("ok"))
 }
 
-pub async fn issue_id(ids: WebhookList) -> Result<impl Reply, Rejection> {
-    let id = ids.issue_id();
+pub async fn issue_id(ids: WebhookList, name: String) -> Result<impl Reply, Rejection> {
+    let id = ids.issue_id(name);
 
     Ok(reply::json(&id))
 }
 
-pub async fn issue_perm_id(ids: WebhookList) -> Result<impl Reply, Rejection> {
-    let id = match ids.issue_perm_id() {
-        Ok(dat) => dat,
-        Err(err) => return Ok(reply::with_status(reply::json(&err.to_string()), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
-    };
+pub async fn new_connecion(ids: WebhookList, username: String) -> Result<impl Reply, Rejection> {
+    ids.anounce_new_user(username);
 
-    Ok(reply::with_status(reply::json(&id), warp::http::StatusCode::OK))
+    Ok(warp::reply::json(&String::new()))
 }
