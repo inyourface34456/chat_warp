@@ -1,4 +1,4 @@
-use crate::{WebhookList, Message};
+use crate::{Message, WebhookList};
 use std::convert::Infallible;
 use warp::{reject, reply, sse::Event, Rejection, Reply};
 
@@ -13,6 +13,9 @@ pub async fn send(message: Message, ids: WebhookList) -> Result<impl Reply, Reje
     };
 
     let _ = sender.send(serde_json::to_string(&message).unwrap());
+
+    ids.send(message);
+
     Ok(reply::html("ok"))
 }
 
@@ -26,4 +29,13 @@ pub async fn new_connecion(ids: WebhookList, username: String) -> Result<impl Re
     ids.anounce_new_user(username);
 
     Ok(warp::reply::json(&String::new()))
+}
+
+pub async fn get_history(ids: WebhookList, channel_id: String) -> Result<impl Reply, Rejection> {
+    let history = match ids.get_channel_history(channel_id) {
+        Some(dat) => dat,
+        None => return Err(reject()),
+    };
+
+    Ok(warp::reply::json(&serde_json::to_string(&history).unwrap()))
 }

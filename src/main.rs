@@ -101,7 +101,20 @@ async fn main() {
         .and(json_string())
         .and_then(issue_id);
 
-    let route = send_to_data.or(listen).or(get_id).or(new_channel_listener).or(new_connecion).or(new_user_listener);
+    let history = warp::post()
+        .and(warp::path("history"))
+        .and(warp::path::end())
+        .and(ids_filter.clone())
+        .and(json_string())
+        .and_then(get_history);
+
+    let route = send_to_data
+        .or(listen)
+        .or(get_id)
+        .or(new_channel_listener)
+        .or(new_connecion)
+        .or(new_user_listener)
+        .or(history);
 
     warp::serve(route).run(([127, 0, 0, 1], 8080)).await;
 }

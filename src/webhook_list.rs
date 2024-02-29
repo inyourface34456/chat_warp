@@ -1,4 +1,4 @@
-use crate::{to_outer, Outer};
+use crate::{to_outer, Message, MessageHistory, Outer, ShortMessage, LENGTH};
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
 use std::fs;
@@ -11,6 +11,7 @@ pub struct WebhookList {
     new_channel_listener: Sender<String>,
     new_user_listner: Sender<String>,
     user_list: Outer<Vec<String>>,
+    message_history: Outer<HashMap<String, MessageHistory<LENGTH>>>,
 }
 
 impl WebhookList {
@@ -20,14 +21,12 @@ impl WebhookList {
             new_channel_listener: broadcast::channel(16).0,
             new_user_listner: broadcast::channel(16).0,
             user_list: to_outer(vec![]),
+            message_history: to_outer(HashMap::new()),
         }
     }
 
     fn from_list(ids: Outer<HashMap<String, Sender<String>>>) -> Self {
-        Self {
-            ids,
-            ..Self::new()
-        }
+        Self { ids, ..Self::new() }
     }
 
     pub fn load(path: String) -> Self {
@@ -82,10 +81,7 @@ impl WebhookList {
 
     pub fn get_id(&self, id: String) -> Option<(Sender<String>, Receiver<String>)> {
         if let Ok(ids) = self.ids.read() {
-            match ids.get(&id) {
-                Some(dat) => Some((dat.clone(), dat.subscribe())),
-                None => None,
-            }
+            ids.get(&id).map(|dat| (dat.clone(), dat.subscribe()))
         } else {
             None
         }
@@ -105,5 +101,21 @@ impl WebhookList {
         }
 
         let _ = self.new_user_listner.send(username);
+    }
+
+    pub fn get_channel_history(&self, channel: String) -> Option<Vec<ShortMessage>> {
+        if let Ok(history) = self.message_history.read() {
+            Some(history.get(&channel)?.history().into())
+        } else {
+            None
+        }
+    }
+
+    pub fn send(&self, message: Message) {
+        if let Ok(mut history) = self.message_history.write() {
+            if let Some(dat) = history.get_mut(&message.destnation) {
+                dat.push(message.into())
+            }
+        }
     }
 }
